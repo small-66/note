@@ -1,0 +1,34 @@
+1. event.preventDefault();  -- 阻止元素的默认事件。
+注：a元素的点击跳转的默认事件 ，
+button，radio等表单元素的默认事件 ，
+div 元素没有默认事件
+例：
+复制代码 代码如下:
+
+<a href="http://www.baidu.com" target="_black">百度</a>
+复制代码 代码如下:
+
+var samp = document.getElementByTagName("a");
+samp.addEventListener("click",function(e){e.preventDefault()},false);
+解释：点击链接的时候正常情况下会发生跳转，但是现在我们阻止了它的默认事件，即跳转事件，这时就不会跳转到百度了。
+
+2. event.stopPropagation();  -- 阻止元素冒泡事件
+注：嵌套元素一般都存在冒泡事件，会带来某些影响
+例：
+复制代码 代码如下:
+
+<div id="c1" onclick="alert(1)">
+<div id="c2" onlick="alert(2)">
+<input type="button" id="c3" value="点击" onclick="alert(3)">
+</div>
+</div>
+这里点击button的时候，浏览器会先后弹出3,2,1，本来只想让绑定在button上的事件发生,却无意中触发了它的两个父级上的事件，这里我们只是做了一个简单测试，试想如果在项目开发中，某个按钮和他的父级同时绑定了很重要的事件，那么结果会惨不忍睹。这时的处理方法就是阻止冒泡事件。
+给input注册click事件，同时阻止它的冒泡事件
+复制代码 代码如下:
+
+document.getElementById('c3').addEventListener('click',function(e){e.stopPropagation()},false);
+
+
+关于JS事件的在线查询工具，归纳总结了JS常用的事件类型与函数功能：
+javascript事件与功能说明大全：
+http://tools.jb51.net/table/javascript_event
