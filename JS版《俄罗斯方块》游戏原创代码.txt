@@ -1,0 +1,597 @@
+// ==============================================================
+// 1、全局变量及全局函数定义 
+// ==============================================================
+
+window.CELL = 20; // 每个单元格像素大小
+window.BORDER = 1; // 单元格边框大小
+window.ROWS = 20; // 最多有几行单元格
+window.COLS = 12; // 最多有几列单元格
+window.INTERVAL = 500; // 间隔时间
+window.BGCOLOR = "#FFFFFF"; // 单元格背景色
+window.BORDER_COLOR = "#000000"; // 单元格边框颜色
+window.GAME = null; // 游戏对象
+
+// 方块组合产生的矩阵(共7种组合)
+window.TYPE = [ 
+	[[0, 0], [0, 1], [0, 2], [0, 3]], //  ━
+	[[0, 1], [0, 2], [1, 1], [1, 2]], //  ■
+	[[0, 0], [0, 1], [0, 2], [1, 1]], //  ┻
+	[[0, 0], [0, 1], [0, 2], [1, 2]], //  ━┛
+	[[0, 0], [0, 1], [0, 2], [1, 0]], // ┗━
+	[[0, 0], [0, 1], [1, 1], [1, 2]], // ┏┛
+	[[1, 0], [1, 1], [0, 1], [0, 2]]  // ┗┓
+];
+
+// 获取浏览器类型
+window.getBrowser = function (){  
+        var browserName = navigator.userAgent.toLowerCase();  
+        if(/msie/i.test(browserName) && !/opera/.test(browserName)){  
+            return "IE";  
+        }else if(/firefox/i.test(browserName)){  
+            return "Firefox";  
+        }else if(/chrome/i.test(browserName) && /webkit/i.test(browserName) && /mozilla/i.test(browserName)){  
+            return "Chrome";  
+        }else if(/opera/i.test(browserName)){  
+            return "Opera";  
+        }else if(/webkit/i.test(browserName) &&!(/chrome/i.test(browserName) && /webkit/i.test(browserName) && /mozilla/i.test(browserName))){  
+            return "Safari";  
+        }else{  
+            return ("unKnow");  
+        }  
+}  
+
+// 判断是否为IE浏览器
+window.isIE = function()
+{
+  return (getBrowser() == "IE");
+}
+
+
+
+// 按下任何键盘事件
+document.onkeydown = function(e)
+{
+	var e = e||event;
+	var currKey = e.keyCode||e.which||e.charCode;
+    var keyName;
+	if((currKey>7&&currKey<14)||(currKey>31&&currKey<47))
+	{
+	   	GAME.onkeydown(currKey);
+	}
+}
+
+// 浏览器窗口失去焦点时
+window.onblur = function()
+{
+	GAME.pause();
+}
+
+// 整个页面加载完成后，开始创建游戏
+window.onload = function(){
+    
+    document.body.innerHTML = '<div id="container" style="margin:0 auto;padding:0;"><div style="float:left;" ><TABLE cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><TBODY id="grid"></TBODY></TABLE></div><div  style="float:right;font-size:9pt;"  align="center"><TABLE  cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:10px;"><TBODY id="nextshow"></TBODY></TABLE><div ></div><div style="color:red;"></div><div style="margin-top:40px;text-align:left;margin-left:20px;">操作说明：<br><br>空格键：暂停/继续<br>方向键左：方块左移<br>方向键右：方块右移<br>方向键下：方块下移<br>方向键上：方块变形</div></div></div>';
+    GAME =  new Container(ROWS, COLS,  CELL, BORDER, INTERVAL, document.getElementById('container'));
+}
+
+
+// ==============================================================
+// 2、游戏主对象Container定义 
+// ==============================================================
+
+// 构造函数
+function Container(rows, cols, span, border, interval, container)
+{
+  this.rows = rows;
+	this.cols = cols;
+  this.span = span;
+  this.border = border;
+	this.interval = interval;
+	this.container = container;
+	this.score = 0;
+	this.grid = [];
+  this.nextgrid = [];
+	this.square = null;
+	this.nextSquare = null;
+	this.running = false;
+	this.gameover = false;
+	this.init();
+	
+}
+// 获取某元素的指定标签子元素
+Container.prototype.getChildByTag = function(e, tag, deep)
+ {
+   var list = [];
+   var children = e.childNodes;
+   for(var i=0; i<children.length;i++)
+   { 	   
+     if(children[i].tagName == tag.toUpperCase())
+	 {
+	 	list[list.length] = children[i];
+	 }
+
+	 if(deep){
+   	    list = list.concat(this.getChildByTag(children[i], tag, deep));
+     }
+
+   }
+   return list;
+}
+// 初始化
+Container.prototype.init = function()
+{
+  var height = this.rows * this.span;
+  var left_width = this.cols * this.span;
+  var right_width = this.span * 4 + 60;
+  var top = (document.documentElement.clientHeight - height) / 2;
+  var divs =  this.getChildByTag(this.container, "div");
+  var left = divs[0], right = divs[1];
+
+
+  this.container.style.height = height + "px";
+  this.container.style.width = (left_width + right_width + 1) + "px";
+  this.container.style.marginTop = top + "px";
+
+  left.style.height = height + "px";
+  left.style.width = left_width + "px";
+  right.style.height = height + "px";
+  right.style.width = right_width + "px";
+
+  this.girdArea = this.getChildByTag(left, "TBODY", true)[0];
+  this.nextArea = this.getChildByTag(right, "TBODY", true)[0];
+  this.msgArea = this.getChildByTag(right, "DIV", true)[0];
+  this.scoreArea = this.getChildByTag(right, "DIV", true)[1];
+
+  this.msgArea.innerHTML = "按空格键开始";
+  this.scoreArea.innerHTML = "行数：0";
+
+  this.initCell();
+
+  this.clear();
+  this.msgArea.style.height =  50 + 'px';
+  //this.msgArea.style.height = height - right_width - 10 + 'px';
+  this.scoreArea.style.height = "20px";
+  this.scoreArea.style.lineHeight = "20px";
+
+}
+
+// 初始化各单元格(方块)
+Container.prototype.initCell = function()
+{
+
+  for(var i=0; i<this.rows; i++){
+  
+    var row = document.createElement("TR");
+
+    this.grid[i] = [];
+    
+    for(var j=0; j<this.cols; j++ ){
+	   
+	    var cell = document.createElement("TD");
+
+		cell.style.width = (this.span - this.border ) + "px";
+		cell.style.height = (this.span - (isIE() ? this.border : 0) ) + "px";
+		cell.style.border = this.border + "px solid " + BORDER_COLOR;
+
+        row.appendChild(cell);
+
+		this.grid[i][j] = cell;
+
+	}
+    this.girdArea.appendChild(row);
+  }
+
+  for(var i=0; i<4; i++){
+  
+    var row = document.createElement("TR");
+
+    this.nextgrid[i] = [];
+    
+    for(var j=0; j<4; j++ ){
+	   
+	    var cell = document.createElement("TD");
+
+		cell.style.width = (this.span - this.border ) + "px";
+		cell.style.height = (this.span - (isIE() ? this.border : 0) ) + "px";
+		//cell.style.border = this.border + "px solid " + BORDER_COLOR;
+
+        row.appendChild(cell);
+		this.nextgrid[i][j] = cell;
+	}
+
+    this.nextArea.appendChild(row);
+  }
+
+}
+
+// 清除整个游戏画面，重新回到初始化状态
+Container.prototype.clear = function()
+{
+  this.scoreArea.innerHTML = "行数：0";
+  this.score = 0;
+  for(var i=0; i<this.rows; i++){
+    for(var j=0; j<this.cols; j++ ){
+		this.grid[i][j].style.background = BGCOLOR;
+ 		this.grid[i][j].status = "";
+	}
+	this.grid[i][0].parentNode.count = "";
+  }
+  this.getNext();
+}
+
+// 产生下一个方块组合
+Container.prototype.getNext = function()
+{
+  var r , c, gameover = false;
+  var leftspace = Math.floor((this.cols - 4) / 2);
+
+  this.square = this.nextSquare || new Square(this);
+  this.nextSquare = new Square(this);
+   
+  for(var i=0; i<4; i++)
+  {
+       r = this.square.matrix[i][0];
+	   c = this.square.matrix[i][1] += leftspace; 
+	   if(this.grid[r][c].status == "1")
+	   {
+	   	  gameover = true;
+		  break;
+	   }
+  }
+
+  for(var i=0;  i<4 && !gameover; i++)
+  {
+       r = this.square.matrix[i][0];
+	   c = this.square.matrix[i][1]; 
+	   this.grid[r][c].style.background = this.square.color;
+  }
+
+  return !gameover;
+   
+}
+
+// 游戏自动运行(定时器控制)
+Container.prototype.run = function()
+{
+
+    if(!this.running){ return ;}
+
+	var me = this;
+
+    if(!this.square.down()){
+	   if(!this.getNext()){
+	      this.msgArea.innerHTML = "游戏结束<br>按空格键开始";
+		  this.running = false;
+		  this.gameover = true;
+		  return ;
+	   }
+	}
+	window.setTimeout(function(){me.run.apply(me);}, me.interval);
+}
+
+// 游戏暂停
+Container.prototype.pause = function()
+{
+	this.running = false;
+	this.msgArea.innerHTML = "游戏暂停中<br>按空格键继续";
+}
+
+// 游戏开始/继续
+Container.prototype.go = function()
+{
+
+	if(this.gameover)
+	{
+	    this.clear();
+	}
+	this.msgArea.innerHTML = "游戏运行中<br>按空格键暂停";
+	this.running = true;
+	this.gameover = false;
+	this.run();
+}
+
+
+// 响应键盘事件
+Container.prototype.onkeydown = function(currKey)
+{
+   switch(currKey)
+　 {
+　 　 　 case 8: keyName = "[退格]"; break;
+　 　 　 case 9: keyName = "[制表]"; break;
+　 　 　 case 13:keyName = "[回车]";  break;
+　 　 　 case 32:keyName = "[空格]"; this.running ?  this.pause() : this.go(); break;
+　 　 　 case 33:keyName = "[PageUp]"; break;
+　 　 　 case 34:keyName = "[PageDown]"; break;
+　 　 　 case 35:keyName = "[End]"; break;
+　 　 　 case 36:keyName = "[Home]"; break;
+　 　 　 case 37:keyName = "[方向键左]"; this.running ? this.square.left() : null; break;
+　 　 　 case 38:keyName = "[方向键上]"; this.running ? this.square.change() : null;break;
+　 　 　 case 39:keyName = "[方向键右]"; this.running ? this.square.right() : null; break;
+　 　 　 case 40:keyName = "[方向键下]"; this.running ? this.square.down() : null;break;
+　 　 　 case 46:keyName = "[删除]"; break;
+　 　 　 default:keyName = ""; break;
+  }
+}
+
+
+// ==============================================================
+// 3、游戏方块对象Square 
+// ==============================================================
+
+// 构造
+function Square(container){
+   this.container = container;
+   this.create();
+}
+
+// 产生一个随机颜色
+Square.prototype.randomColor = function(){
+	//var color = [Math.floor(Math.random() * 256), Math.floor(Math.random() * 256), Math.floor(Math.random() * 256)];
+   var color = "#";
+   for(var i=0; i<6; i++)
+   {
+   	 color += Number(Math.floor(Math.random() * (12 - i))).toString(16);
+   }
+   return  color;
+}
+
+// 产生一个随机的方块组合
+Square.prototype.create = function(){
+
+   var r, c;
+   var type = Math.floor(Math.random() * 7);
+   var randomChange = Math.floor(Math.random() * 4);
+
+   this.matrix = [];
+
+   this.color = this.randomColor();
+
+   for(var i=0; i<4; i++){
+     for(var j=0; j<4; j++ ){
+		this.container.nextgrid[i][j].style.background = "";
+	 }
+   }
+
+   for(var i=0; i<4; i++){
+      r = TYPE[type][i][0];
+	  c = TYPE[type][i][1];
+      this.matrix[i] = [r, c];
+   }
+
+   for(var i=0; i<randomChange; i++){
+	  this.randomMatrix();
+   }
+
+
+   for(var i=0; i<4; i++)
+   {
+      this.container.nextgrid[this.matrix[i][0]][this.matrix[i][1]].style.background = this.color;  // "RGB(" + color.join(",") + ")"
+   }
+   
+
+}
+
+
+// 将已经产生的方块组合进行变形(保证同一组合的方块出来的形状多样化)
+Square.prototype.randomMatrix = function()
+{
+    var r , c;
+	var pos = this.getPosition();
+	var rowSpan = pos.bottom - pos.top;
+    var newMatrix = [];
+
+	for(var i=0; i<4; i++)
+    {
+	  r = this.matrix[i][0] - pos.top;
+	  c = this.matrix[i][1] - pos.left;
+
+	  newMatrix[i] = [c + pos.top, rowSpan - r + pos.left];
+
+	  this.matrix[i][0] = newMatrix[i][0];
+	  this.matrix[i][1] = newMatrix[i][1]; 
+    }
+
+}
+
+// 方块变形(在下降过程中改变方块形状)
+Square.prototype.change = function()
+{
+    var r , c;
+	var pos = this.getPosition();
+	var rowSpan = pos.bottom - pos.top;
+    var newMatrix = [];
+
+	for(var i=0; i<4; i++)
+    {
+	  r = this.matrix[i][0] - pos.top;
+	  c = this.matrix[i][1] - pos.left;
+
+	  newMatrix[i] = [c + pos.top, rowSpan - r + pos.left];
+
+	  if(newMatrix[i][0] >= this.container.rows || newMatrix[i][1] >= this.container.cols ||
+	    this.container.grid[newMatrix[i][0]][newMatrix[i][1]].status == "1"){
+	    return false;
+	  }
+
+    }
+
+	for(var i=0; i<4; i++)
+    {
+      this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = BGCOLOR;
+    }
+
+	for(var i=0; i<4; i++)
+    {
+	  this.matrix[i][0] = newMatrix[i][0];
+	  this.matrix[i][1] = newMatrix[i][1];
+	  this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = this.color;
+    }
+
+}
+
+
+// 方块停止下降(降到底部了)
+Square.prototype.stop = function(){
+
+	var r , c, isEmpty, count, removeRows = [];
+	
+
+	if(this.isStop){ return ;}
+
+	this.isStop = true;
+
+
+	for(var i=0; i<4; i++)
+    {
+	  r = this.matrix[i][0];
+	  c = this.matrix[i][1];
+
+	  count = parseInt(this.container.grid[r][c].parentNode.count || "0") + 1;
+
+  	  this.container.grid[r][c].style.background = this.color;
+	  this.container.grid[r][c].status = "1";
+      this.container.grid[r][c].parentNode.count = count; 
+
+	  if(count >= this.container.cols)
+	  {
+	    removeRows.push(r);
+	  }
+    }
+
+
+ 
+    if(removeRows.length){
+       
+       removeRows.sort();
+	   count = removeRows[removeRows.length - 1] - removeRows[0] + 1;
+       //this.container.scoreArea.innerHTML = removeRows.join()
+	   for(var i=removeRows[0]; i<=removeRows[removeRows.length - 1]; i++)
+	   {
+	      	for(var j=0; j<this.container.cols; j++){
+				this.container.grid[i][j].style.background = BGCOLOR;
+				this.container.grid[i][j].status = "";
+			}
+	   }
+
+	   
+	   for(var i=removeRows[0]-1; i>=0; i--)
+	   {
+	        isEmpty = true;
+	      	for(var j=0; j<this.container.cols; j++){
+				this.container.grid[i + count][j].style.background = this.container.grid[i][j].style.background;
+				this.container.grid[i + count][j].status = this.container.grid[i][j].status;
+                if(this.container.grid[i][j].status == "1") isEmpty = false;
+                this.container.grid[i][j].style.background = BGCOLOR;
+				this.container.grid[i][j].status = "";
+			}
+			this.container.grid[i + count][0].parentNode.count = this.container.grid[i][0].parentNode.count;
+			if(isEmpty) break;
+
+	   }
+	   this.container.score =  this.container.score + count;
+	   this.container.scoreArea.innerHTML =  "分数 : " + this.container.score;
+
+	}
+
+
+	return false;
+}
+
+// 方块下降
+Square.prototype.down = function(){
+   
+   var r , c;
+
+   for(var i=0; i<4; i++){
+
+   	 r = this.matrix[i][0] + 1;
+	 c = this.matrix[i][1];
+	 if(r >= this.container.rows || this.container.grid[r][c].status == "1"){ 	
+	   return this.stop();
+	 }
+   }
+
+   for(var i=0; i<4; i++)
+   {
+     this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = BGCOLOR;
+   }
+ 
+   for(var i=0; i<4; i++){
+     this.matrix[i][0]++;
+	 this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = this.color;
+   }
+   return true;
+
+}
+
+// 方块左移
+Square.prototype.left = function(){
+	
+   var r , c;
+
+   for(var i=0; i<4; i++){
+
+   	 r = this.matrix[i][0];
+	 c = this.matrix[i][1] - 1;
+	 if(c < 0 || this.container.grid[r][c].status == "1"){ 	
+	   return false;
+	 }
+   }
+
+   for(var i=0; i<4; i++)
+   {
+     this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = BGCOLOR;
+   }
+ 
+   for(var i=0; i<4; i++){
+     this.matrix[i][1]-- ;
+	 this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = this.color;
+   }
+
+   return true;
+}
+
+// 方块右移
+Square.prototype.right = function(){
+
+   var r , c;
+
+   for(var i=0; i<4; i++){
+
+   	 r = this.matrix[i][0];
+	 c = this.matrix[i][1] + 1;
+	 if(c >= this.container.cols || this.container.grid[r][c].status == "1"){ 	
+	   return false;
+	 }
+   }
+
+   for(var i=0; i<4; i++)
+   {
+     this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = BGCOLOR;
+   }
+ 
+   for(var i=0; i<4; i++){
+     this.matrix[i][1]++;
+	 this.container.grid[this.matrix[i][0]][this.matrix[i][1]].style.background = this.color;
+   }
+
+   return true;
+}
+
+// 获取方块组合所占矩形区域的位置
+Square.prototype.getPosition = function()
+{
+   var t = {left:10000, top: 10000, right : 0, bottom : 0};
+
+   for(var i=0; i<4; i++)
+   {
+     
+	 t.left = Math.min(t.left, this.matrix[i][1]);
+	 t.top = Math.min(t.top, this.matrix[i][0]);
+
+	 t.right = Math.max(t.right, this.matrix[i][1]);
+	 t.bottom = Math.max(t.bottom, this.matrix[i][0]);
+
+   }
+
+   return t;
+}
