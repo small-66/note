@@ -60,3 +60,24 @@ pull-left pull-right
 		danger       危险
 	可用在：bg-   btn-   text-  等
 	<input type="button" value="首选项" class="btn btn-primary"/>
+
+###导航条
+
+		navbar      
+		navbar-default
+		nav navbar-nav      导航条中菜单项
+		navbar-inverse		比较深颜色的样式
+		navbar-static-top	去掉圆角
+		navbar-fixed-top 	固定导航条
+		navbar-fixed-bottom
+	
+	代码：	
+		<nav class="navbar navbar-default">
+            <div class="container-fluid">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="#">1</a></li>
+                    <li><a href="#">2</a></li>
+                    <li><a href="#">3</a></li>
+                </ul>
+            </div>
+        </nav>
